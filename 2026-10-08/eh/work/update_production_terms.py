@@ -1,0 +1,20 @@
+from pathlib import Path
+p=Path('outputs/보나센_원가계산기.html');s=p.read_text(encoding='utf-8')
+def change(old,new):
+ global s
+ if old not in s: raise RuntimeError('Missing '+old[:90])
+ s=s.replace(old,new)
+change('<small>초도 생산·튜브 필요자금</small>', '<small>총 생산비 (완제품)</small>')
+change('<em>추가 튜브는 판매원가와 별도</em>', '<em>완제품 생산수량 기준 · 추가 튜브비 별도</em>')
+change('<small>기간 이익 (고정비 차감 전)</small>', '<small>기간 이익 (고정비 차감 후)</small>')
+change("$('profit').textContent=c.sold?money(c.profit)+' 원':'—';$('profit').className=c.profit<0?'negative':'positive';", "$('profit').textContent=money(operating.period)+' 원';$('profit').className=operating.period<0?'negative':'positive';")
+change("$('cash').textContent=money(c.cash)+' 원';", "$('cash').textContent=money(c.prodCash)+' 원';")
+change("'매출 대비 이익률 '+pct(c.margin)", "'고정비 차감 후 이익률 '+pct(c.income?operating.period/c.income:null)")
+change('<p class="note" id="manufactureSummary"></p>', '<div class="scroll"><table><thead><tr><th>생산비 구분</th><th class="num">금액 (VAT 포함, 원)</th></tr></thead><tbody><tr><td>완제품 제조단가 × 생산수량</td><td class="num" id="productBaseCost">—</td></tr><tr><td>제조·검사 추가비</td><td class="num" id="productExtraCost">—</td></tr></tbody><tfoot><tr class="result"><td>총 생산비 (완제품)</td><td class="num" id="productTotalCost">—</td></tr><tr><td>추가 튜브 생산비 (별도)</td><td class="num" id="tubeProductionCost">—</td></tr></tfoot></table></div><p class="note" id="manufactureSummary"></p>')
+change("$('manufactureSummary').textContent=", "$('productBaseCost').textContent=money(state.manufacture*(1+state.vat/100)*state.production);$('productExtraCost').textContent=money(state.manufactureExtra);$('productTotalCost').textContent=money(c.prodCash);$('tubeProductionCost').textContent=money(c.tubeCash);$('manufactureSummary').textContent=")
+change(' · 완제품 생산비 ${money(c.prodCash)}원 · 예비 튜브 ${money(c.tubeCash)}원', '')
+change('추가 튜브는 예비 자재로서 초도 필요자금에만 반영합니다.', '총 생산비는 완제품 전체 생산수량의 제조비입니다. 추가 튜브 생산비는 별도로 표시하며, 완제품 제조단가에 이미 포함된 튜브와 중복하여 판매 제품 원가에 반영하지 않습니다.')
+change("['초도 생산·튜브 필요자금',c.cash]", "['총 생산비 (완제품)',c.prodCash],['추가 튜브 생산비 (별도)',c.tubeCash]")
+change('기간 시작 시 1회 비용과 월 반복비를 구분합니다.', '일회성 비용과 월 반복비를 구분합니다.')
+change("['unit','profit','adTotal','cash']", "['unit','profit','adTotal','cash','productBaseCost','productExtraCost','productTotalCost','tubeProductionCost']")
+p.write_text(s,encoding='utf-8');print('Production totals and additional tube costs separated; main profit shows ongoing costs including fixed costs')

@@ -1,0 +1,41 @@
+from pathlib import Path
+p=Path('outputs/보나센_원가계산기.html');s=p.read_text(encoding='utf-8')
+def change(a,b):
+ global s
+ if a not in s: raise RuntimeError('Missing '+a[:100])
+ s=s.replace(a,b)
+change('<label>일회성 비용 반영 연도', '<label>확인할 날짜<select id="ledgerDay"></select></label><label>선택일 매출목표 (원)<input id="ledgerDailyTarget" type="number" min="0" step="any"></label><label>일 목표 설정<button id="resetDailyTarget" type="button">월 목표로 자동 계산</button></label><label>일회성 비용 반영 연도')
+change("ledger:{year:2026,month:10,view:", "ledger:{year:2026,month:10,day:8,view:")
+change('function validateLedger(s){const l=s.ledger;', 'function validateLedger(s){const l=s.ledger;if(l&&l.day===undefined)l.day=8;')
+change("||!['actual','plan'].includes(l.view)", "||!Number.isInteger(l.day)||l.day<1||l.day>31||!['actual','plan'].includes(l.view)")
+change('for(const [date,items] of Object.entries(y.days)){', "if(y.dailyTargets===undefined)y.dailyTargets={};if(!y.dailyTargets||typeof y.dailyTargets!=='object'||Array.isArray(y.dailyTargets))throw Error('일 목표 형식 오류');for(const [date,target] of Object.entries(y.dailyTargets))if(!validLedgerDate(date,+year)||typeof target!=='number'||!Number.isFinite(target)||target<0)throw Error('일 목표 날짜·금액 오류');for(const [date,items] of Object.entries(y.days)){")
+change("={targets:Array(12).fill(0),days:{}}", "={targets:Array(12).fill(0),dailyTargets:{},days:{}}")
+change("return s.ledger.years[k];}", "const y=s.ledger.years[k];if(y.dailyTargets===undefined)y.dailyTargets={};return y;}")
+change('function ledgerColumns(s)', '''function selectedLedgerDate(s){const l=s.ledger;return l.year+'-'+String(l.month).padStart(2,'0')+'-'+String(Math.min(l.day,daysInMonth(l.year,l.month))).padStart(2,'0');}
+function dailyGoal(s,date){const y=ensureLedgerYear(s),month=Number(date.slice(5,7));return Object.hasOwn(y.dailyTargets,date)?y.dailyTargets[date]:y.targets[month-1]/daysInMonth(s.ledger.year,month);}
+function dailyRevenueTarget(s,date=selectedLedgerDate(s)){const y=ensureLedgerYear(s),actual=dailyTotals(Object.values(y.days[date]||{})).income,target=dailyGoal(s,date);return{date,actual,target,ratio:target>0?actual/target:null,remaining:target>0?Math.max(0,target-actual):null,recorded:Object.hasOwn(y.days,date)};}
+function ledgerColumns(s)''')
+change("const l=s.ledger,y=ensureLedgerYear(s);$('ledgerYear')", "const l=s.ledger,y=ensureLedgerYear(s);if(l.month)l.day=Math.min(l.day,daysInMonth(l.year,l.month));$('ledgerDay').disabled=!l.month;$('ledgerDay').innerHTML=l.month?Array.from({length:daysInMonth(l.year,l.month)},(_,i)=>`<option value=\"${i+1}\" ${l.day===i+1?'selected':''}>${l.month}월 ${i+1}일</option>`).join(''):'<option>연간 합계</option>';$('ledgerDailyTarget').disabled=!l.month;$('resetDailyTarget').disabled=!l.month;$('ledgerDailyTarget').value=l.month?Number(dailyGoal(s,selectedLedgerDate(s)).toFixed(6)):'';$('ledgerYear')")
+change('<th class="num">일 매출 합계</th>', '<th class="num">일 매출 합계</th><th class="num">일 목표</th><th class="num">일 달성률</th>')
+change('<td class="num" id="dailyIncome-${date}"></td>', '<td class="num" id="dailyIncome-${date}"></td><td class="num" id="dailyGoal-${date}"></td><td class="num" id="dailyRate-${date}"></td>')
+change("$('dailyIncome-'+date).textContent=Object.keys(items).length?money(d.income):'—';", "$('dailyIncome-'+date).textContent=Object.keys(items).length?money(d.income):'—';const g=dailyRevenueTarget(s,date);$('dailyGoal-'+date).textContent=g.target>0||Object.hasOwn(y.dailyTargets,date)?money(g.target):'—';$('dailyRate-'+date).textContent=g.recorded?pct(g.ratio):'미입력';")
+change('<td class="num">${money(selected.income)}</td></tr>', '<td class="num">${money(selected.income)}</td><td class="num">월 목표 ${money(y.targets[l.month-1])}</td><td class="num">${pct(y.targets[l.month-1]>0?selected.income/y.targets[l.month-1]:null)}</td></tr>')
+change("rows=chartModel(graphState),c=", "rows=chartModel(graphState),c=")
+change("const goal=revenueTarget(graphState);", "const dailyMode=s.ledger.view==='actual'&&s.ledger.month>0,goal=dailyMode?dailyRevenueTarget(s):revenueTarget(graphState);if(dailyMode){rows[0]={label:'日 매출목표'.replace('日','선택일'),value:goal.target,color:'#7257b2'};rows[1]={label:'선택일 매출',value:goal.actual,color:'#163f62'};for(let i=2;i<rows.length;i++)rows[i].label='월 '+rows[i].label.replace('월 고정비 (기간 합계)','고정비');}")
+change('목표 매출 달성률 ${pct(goal.ratio)}', "${dailyMode?'일 매출':'목표 매출'} 달성률 ${pct(goal.ratio)}")
+change('기간 목표 ${money(goal.target)}원', "${dailyMode?'선택일 목표':'기간 목표'} ${money(goal.target)}원")
+change("$('chartPeriod').textContent=s.ledger.view==='actual'?", "$('chartPeriod').textContent=dailyMode?goal.date+' · 매출·목표는 선택일 기준 / 비용·이익은 해당 월 누계 기준':s.ledger.view==='actual'?")
+change("$('chartResult').textContent='매출 '", "$('chartResult').textContent=(dailyMode?'월 누계 기준: ':'')+'매출 '")
+change('maximum=Math.max(1,...rows.map(r=>Math.abs(r.value)))', 'maximum=0')
+# maximum was a const chain; calculate chart widths after the daily values have been replaced.
+change("net=rows[rows.length-1].value,maximum=0;", "net=rows[rows.length-1].value;let maximum;")
+change("$('targetSummary').innerHTML=", "maximum=Math.max(1,...rows.map(r=>Math.abs(r.value)));$('targetSummary').innerHTML=")
+change("goal.ratio===null?'월 목표 매출을 입력하면 달성률이 표시됩니다.'", "goal.ratio===null?'매출목표를 입력하면 달성률이 표시됩니다.':dailyMode&&!goal.recorded?'선택일 매출이 미입력입니다. 일 목표 '+money(goal.target)+'원 · 날짜별 판매 세트수를 입력하세요.'")
+change("setDailySale(state,el.dataset.dailyDate,el.dataset.dailyBundle,Number(el.value));", "setDailySale(state,el.dataset.dailyDate,el.dataset.dailyBundle,Number(el.value));state.ledger.day=Number(el.dataset.dailyDate.slice(8,10));")
+change("['ledgerYear','ledgerTarget','ledgerOnceYear']", "['ledgerYear','ledgerTarget','ledgerDailyTarget','ledgerOnceYear']")
+change("if(el.id==='ledgerTarget'){", "if(el.id==='ledgerDailyTarget'){if(!state.ledger.month||!Number.isFinite(n)||n<0)throw Error('월 탭에서 0 이상의 일 목표를 입력하세요.');ensureLedgerYear(state).dailyTargets[selectedLedgerDate(state)]=n;}else if(el.id==='ledgerTarget'){")
+change("$('ledgerView').onchange=", "$('ledgerDay').onchange=()=>{state.ledger.day=Number($('ledgerDay').value);update();};$('resetDailyTarget').onclick=()=>{delete ensureLedgerYear(state).dailyTargets[selectedLedgerDate(state)];update();};$('ledgerView').onchange=")
+change('일매출 기록 기준에서는 선택 월 또는 연간 누적 매출을 목표와 비교합니다.', '월 탭에서는 선택한 날짜의 일매출과 일 목표로 달성률을 계산합니다. 일 목표 기본값은 월 목표 ÷ 해당 월의 날짜 수이며 날짜별로 수정할 수 있습니다. 매출을 입력할 때 선택 날짜가 자동으로 바뀝니다. 비용과 이익은 일매출에서 차감하지 않고 기존 월 누계 기준을 유지합니다. 연간 탭에서는 연간 누적 매출과 목표를 비교합니다.')
+change('모든 막대는 같은 금액 기준입니다.', '모든 막대는 같은 금액 척도를 사용합니다. 월 탭의 매출·목표 막대는 선택일 기준이며, 비용·이익 막대는 월 누계 기준입니다.')
+s=s.replace("label:'日 매출목표'.replace('日','선택일')", "label:'선택일 매출목표'")
+p.write_text(s,encoding='utf-8');print('Daily selected-date goals and attainment added; costs and profit stay monthly, with explicit labels')

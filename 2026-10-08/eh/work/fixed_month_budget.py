@@ -1,0 +1,29 @@
+from pathlib import Path
+p=Path('outputs/보나센_원가계산기.html');s=p.read_text(encoding='utf-8')
+def change(a,b):
+ global s
+ if a not in s: raise RuntimeError('Missing '+a[:100])
+ s=s.replace(a,b)
+change('<div id="ledgerPanel"', '<section style="margin:14px 0;padding:16px"><h3>월 전체 원가·지출예산</h3><p class="notice">월 비용은 일매출과 별도로 미리 설정하고 고정합니다. 누적 판매수량이 늘어나도 이 비용은 자동 증가하지 않습니다. 처음에는 위쪽 원가·판매계획·광고·관리비 설정을 가져옵니다. 판매계획이 0이면 제품원가 예산은 총 생산비로 시작하므로 해당 월 부담액으로 조정하세요.</p><div class="scroll"><table><thead><tr><th>비용 항목</th><th class="num">월 전체 예산 (원)</th></tr></thead><tbody id="monthBudgetBody"></tbody><tfoot><tr class="result"><td>월 지출 총계 (원가 포함)</td><td class="num" id="monthBudgetTotal"></td></tr></tfoot></table></div><button id="refreshMonthBudget">현재 위쪽 설정으로 월 예산 다시 가져오기</button><p class="note">월 예산은 자동 저장됩니다. 이후 위쪽 기본단가 변경은 확정한 월 예산에 자동 반영되지 않습니다. 재설정은 버튼으로 수행하세요. 아래 손익은 누적 매출에서 월 전체 비용을 뺀 금액입니다.</p></section><div id="ledgerPanel"')
+change("return{unit,prodCash,tubeCash,cash:prodCash+tubeCash", "return applyMonthBudget(s,{unit,prodCash,tubeCash,cash:prodCash+tubeCash")
+change("margin:income?profit/income:null};}", "margin:income?profit/income:null});}")
+change('function fixedTotals(s){const monthly=', 'function fixedTotals(s){if(s.monthCostBudget)return{monthly:s.monthCostBudget.fixed/s.months,period:s.monthCostBudget.fixed};const monthly=')
+change('function ledgerGraphState(s){', 'function ledgerGraphState(s){')
+change("return{...s,months,monthlyTarget:target/months,sales:cumulativeLedgerItems(s)", "return{...s,monthCostBudget:combinedMonthBudget(s),months,monthlyTarget:target/months,sales:cumulativeLedgerItems(s)")
+change("if(y.dailyTargets===undefined)y.dailyTargets={};if(!y.dailyTargets", "if(y.budgets===undefined)y.budgets={};if(!y.budgets||typeof y.budgets!=='object'||Array.isArray(y.budgets))throw Error('월 예산 형식 오류');for(const [month,b] of Object.entries(y.budgets)){if(!/^(?:[1-9]|1[0-2])$/.test(month)||!b||budgetKeys.some(k=>typeof b[k]!=='number'||!Number.isFinite(b[k])||b[k]<0))throw Error('월 예산 금액 오류');}if(y.dailyTargets===undefined)y.dailyTargets={};if(!y.dailyTargets")
+change("={targets:Array(12).fill(0),dailyTargets:{},days:{}}", "={targets:Array(12).fill(0),budgets:{},dailyTargets:{},days:{}}")
+change("const y=s.ledger.years[k];if(y.dailyTargets", "const y=s.ledger.years[k];if(y.budgets===undefined)y.budgets={};if(y.dailyTargets")
+# Put constants before saved-state validation, while the declaration functions remain hoisted.
+change("try{const saved=localStorage.getItem(key);", "const budgetKeys=['cogs','fee','ship','pack','ad','admin','fixed'];const budgetNames=['제품 제조원가','판매수수료','배송비','포장비','광고·마케팅비 (리뷰 포함)','제품 관리비','월 고정비'];\ntry{const saved=localStorage.getItem(key);")
+change('function costBasis(s)', '''function initialMonthBudget(s,month){const once=s.ledger.year===s.ledger.onceYear&&month===s.ledger.onceMonth,plan={...s,monthCostBudget:undefined,months:1,reviewEnabled:s.reviewEnabled&&once,sales:s.sales.map(r=>({...r,orders:r.orders/s.months})),ads:s.ads.map(r=>r.cycle==='once'?{...r,enabled:r.enabled&&once}:r),admin:s.admin.map(r=>r.cycle==='once'?{...r,enabled:r.enabled&&once}:r)},c=calculate(plan);return{cogs:c.sold?c.cogs:c.prodCash,fee:c.fee,ship:c.ship,pack:c.pack,ad:c.ad,admin:c.admin,fixed:fixedTotals(plan).period};}
+function monthlyBudget(s,month){const y=ensureLedgerYear(s);if(!Object.hasOwn(y.budgets,month))y.budgets[month]=initialMonthBudget(s,month);return y.budgets[month];}
+function combinedMonthBudget(s){if(s.ledger.month)return monthlyBudget(s,s.ledger.month);const result=Object.fromEntries(budgetKeys.map(k=>[k,0]));for(let m=1;m<=12;m++){const b=monthlyBudget(s,m);for(const k of budgetKeys)result[k]+=b[k];}return result;}
+function applyMonthBudget(s,c){if(!s.monthCostBudget)return c;const b=s.monthCostBudget,total=b.cogs+b.fee+b.ship+b.pack+b.ad+b.admin,profit=c.income-total;return{...c,cogs:b.cogs,fee:b.fee,ship:b.ship,pack:b.pack,ad:b.ad,admin:b.admin,total,profit,alloc:c.sold?(b.ad+b.admin)/c.sold:null,per:c.sold?total/c.sold:null,margin:c.income?profit/c.income:null};}
+function renderMonthBudget(s){const b=combinedMonthBudget(s),active=document.activeElement,typing=active&&active.dataset&&active.dataset.budgetKey!==undefined;$('monthBudgetBody').innerHTML=typing?$('monthBudgetBody').innerHTML:budgetKeys.map((k,i)=>`<tr><td>${budgetNames[i]}</td><td class="num"><input type="number" min="0" step="any" value="${b[k]}" data-budget-key="${k}" aria-label="${budgetNames[i]} 월 예산" ${s.ledger.month?'':'readonly'}></td></tr>`).join('');$('monthBudgetTotal').textContent=money(budgetKeys.reduce((sum,k)=>sum+b[k],0));$('refreshMonthBudget').disabled=!s.ledger.month;}
+function costBasis(s)''')
+change('function renderLedger(s){const l=', 'function renderLedger(s){renderMonthBudget(s);const l=')
+change("document.addEventListener('input',e=>{const el=e.target;", "document.addEventListener('input',e=>{const el=e.target;if(el.dataset.budgetKey!==undefined){try{const k=el.dataset.budgetKey,n=Number(el.value);if(!state.ledger.month||!budgetKeys.includes(k)||el.value===''||!Number.isFinite(n)||n<0)throw Error('월 예산은 월 탭에서 0 이상의 숫자로 입력하세요.');monthlyBudget(state,state.ledger.month)[k]=n;update();}catch(err){$('ledgerStatus').textContent=err.message;$('ledgerStatus').className='warn';}return;}")
+change("$('ledgerDay').onchange=", "$('refreshMonthBudget').onclick=()=>{if(confirm('선택 월의 원가·지출예산을 현재 위쪽 설정으로 다시 가져올까요?')){ensureLedgerYear(state).budgets[state.ledger.month]=initialMonthBudget(state,state.ledger.month);update();}};$('ledgerDay').onchange=")
+change('일매출 기준의 제조·광고·관리·고정비 및 이익은 현재 원가 입력값을 적용한 추정치이며, 일회성 비용은 지정한 연월에만 반영합니다.', '일매출 기준의 비용은 미리 설정한 월 전체 원가·지출예산이며, 이익은 그 예산을 차감한 값입니다. 일회성 비용은 예산 최초 설정 시 지정 연월에만 포함됩니다.')
+change("const s=", "const s=") if False else None
+p.write_text(s,encoding='utf-8');print('Monthly expenses including product cost are fixed budgets, independent of cumulative daily sales')

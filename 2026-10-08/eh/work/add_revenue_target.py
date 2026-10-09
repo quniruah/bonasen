@@ -1,0 +1,20 @@
+from pathlib import Path
+p=Path('outputs/보나센_원가계산기.html');s=p.read_text(encoding='utf-8')
+def change(a,b):
+ global s
+ if a not in s: raise RuntimeError('Missing '+a[:90])
+ s=s.replace(a,b)
+change('<div class="grid"><label>개당 제조원가', '<div class="grid"><label>월 목표 매출 (VAT 포함, 원)<input id="monthlyTarget" type="number" min="0" step="any"></label><label>개당 제조원가')
+change('<div class="notice" id="chartResult"', '<div class="notice" id="targetSummary" aria-live="polite"></div><label class="note" for="targetProgress">목표 매출 달성률 (100%를 넘는 수치는 위에 표시)</label><progress id="targetProgress" max="100" value="0" style="width:100%;height:18px;accent-color:#168e9c"></progress><p class="note">목표와 달성률은 제품 매출과 고객 부담 배송비를 합한 매출 총계를 기준으로 계산합니다. 판매계획 입력값에 따른 예상 달성률이며, 적용 개월수만큼 월 목표를 곱해 기간 목표와 비교합니다.</p><div class="notice" id="chartResult"')
+change("version:1,costOrder:", "version:1,monthlyTarget:0,costOrder:")
+change("const fields=['period'", "const fields=['monthlyTarget','period'")
+change('function validate(v){const d=defaults();', 'function validate(v){const d=defaults();if(v&&v.version===1&&v.monthlyTarget===undefined)v.monthlyTarget=0;')
+change('function chartModel(s)', "function revenueTarget(s){const actual=calculate(s).income,target=s.monthlyTarget*s.months;return{actual,target,ratio:target>0?actual/target:null,remaining:target>0?Math.max(0,target-actual):null};}\nfunction chartModel(s)")
+change("return [{label:'매출 총계'", "return [{label:'목표 매출 (기간 합계)',value:s.monthlyTarget*s.months,color:'#7257b2'},{label:'매출 총계'")
+change('net=rows[6].value', 'net=rows[rows.length-1].value')
+change("${i===6?'chart-final':''}", "${i===rows.length-1?'chart-final':''}")
+change("i===6?'positive':''", "i===rows.length-1?'positive':''")
+change("$('chartPeriod').textContent=", "const goal=revenueTarget(s);$('targetSummary').innerHTML=goal.ratio===null?'월 목표 매출을 입력하면 달성률이 표시됩니다.':`<strong style=\"font-size:22px\">목표 매출 달성률 ${pct(goal.ratio)}</strong><br>기간 목표 ${money(goal.target)}원 / 현재 계획 매출 ${money(goal.actual)}원 · ${goal.ratio>=1?'목표 초과 '+money(goal.actual-goal.target)+'원':'목표까지 '+money(goal.remaining)+'원'}`;$('targetProgress').value=goal.ratio===null?0:Math.min(100,goal.ratio*100);$('targetProgress').setAttribute('aria-valuetext',goal.ratio===null?'목표 미입력':pct(goal.ratio));$('chartPeriod').textContent=")
+change("$('chartPeriod').textContent='';", "$('chartPeriod').textContent='';$('targetSummary').textContent='입력값을 확인하세요.';$('targetProgress').value=0;")
+change("['적용 개월',state.months]", "['적용 개월',state.months],['월 목표 매출',state.monthlyTarget],['기간 목표 매출',revenueTarget(state).target],['목표 매출 달성률',revenueTarget(state).ratio===null?'목표 미입력':pct(revenueTarget(state).ratio)]")
+p.write_text(s,encoding='utf-8');print('Added persisted monthly revenue target, period target bar, live uncapped attainment percentage, progress and remaining revenue')
