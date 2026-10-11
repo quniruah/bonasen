@@ -569,7 +569,7 @@ function buildPublicState(source){
   for(const group of ['ads','admin'])result[group]=s[group].map(r=>Object.fromEntries(['enabled','name','cycle','rate','qty'].map(k=>[k,r[k]])));
   result.fixed=s.fixed.map(r=>({enabled:r.enabled,name:r.name,rate:r.rate}));
   const year=ensureLedgerYear(s),month=s.ledger.month,dates={};
-  for(const row of cumulativeLedgerItems(s)){if(!dates[row.date])dates[row.date]={};dates[row.date][row.id]=Object.fromEntries(['channel','units','price','orders','fee','ship','pack','shippingIncome'].map(k=>[k,row[k]]));}
+  for(const row of cumulativeLedgerItems(s)){if(!dates[row.date])dates[row.date]={};dates[row.date][row.id]=Object.fromEntries(['channel','units','price','orders','fee','ship','pack','shippingIncome'].map(k=>[k,row[k]]));if(isOfflineSale(row)&&typeof row.buyer==='string')dates[row.date][row.id].buyer=row.buyer.slice(0,120);}
   const fixedMonths={};for(const [m,rows] of Object.entries(year.fixedMonths||{}))if(!month||Number(m)===month)fixedMonths[m]=rows.map(r=>({enabled:r.enabled,name:r.name,rate:r.rate}));
   const expenseMonths={};for(const [m,groups] of Object.entries(year.expenseMonths||{}))if(!month||Number(m)===month)expenseMonths[m]={ads:expenseRowCopy(groups.ads),admin:expenseRowCopy(groups.admin)};
   const budgets={};for(const [m,budget] of Object.entries(year.budgets))if(!month||Number(m)===month)budgets[m]=Object.fromEntries(budgetKeys.map(k=>[k,budget[k]]));
