@@ -1,7 +1,16 @@
-let lastRevision=null,lastTemplate=null,loading=false,currentReport=null,frameReady=false;
+let lastRevision=null,lastTemplate=null,loading=false,currentReport=null,frameReady=false,selectedDate=null,viewSequence=0;
 const reportFrame=document.getElementById('report');
-function sendCurrentReport(){if(frameReady&&currentReport?.schema==='bonasen-public-v2')reportFrame.contentWindow.postMessage({type:'BONASEN_REPORT',report:currentReport},'*');}
-window.addEventListener('message',event=>{if(event.source!==reportFrame.contentWindow)return;if(event.data?.type==='BONASEN_VIEW_READY'){frameReady=true;sendCurrentReport();}});
+function reportForSelectedDate(report){
+ const views=report.dateViews;if(!views||!Array.isArray(views.keys)||!Array.isArray(views.values)||views.year!==report.state?.ledger?.year||!views.dates)return report;
+ const initial=report.state.ledger.year+'-'+String(report.state.ledger.month).padStart(2,'0')+'-'+String(report.state.ledger.day).padStart(2,'0');
+ if(!selectedDate||!Object.hasOwn(views.dates,selectedDate))selectedDate=Object.hasOwn(views.dates,initial)?initial:views.maxDate;
+ const refs=views.dates[selectedDate];if(!Array.isArray(refs)||refs.length!==views.keys.length)throw Error('날짜별 공개 결과 형식을 확인하세요.');
+ const state=Object.fromEntries(views.keys.map((key,i)=>[key,JSON.parse(JSON.stringify(views.values[refs[i]]))])),months={};
+ for(const date of Object.keys(views.dates))if(/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number(date.slice(0,4))===views.year){const month=Number(date.slice(5,7));months[month]=Math.max(months[month]||0,Number(date.slice(8)));}
+ state.publicDateChoices={year:views.year,months};return{schema:report.schema,publishedAt:report.publishedAt,state};
+}
+function sendCurrentReport(){if(frameReady&&currentReport?.schema==='bonasen-public-v2')reportFrame.contentWindow.postMessage({type:'BONASEN_REPORT',report:reportForSelectedDate(currentReport)},'*');}
+window.addEventListener('message',event=>{if(event.source!==reportFrame.contentWindow)return;if(event.data?.type==='BONASEN_VIEW_READY'){frameReady=true;sendCurrentReport();}else if(event.data?.type==='BONASEN_SELECT_DATE'){const date=event.data.date;if(typeof date!=='string'||!currentReport?.dateViews?.dates||!Object.hasOwn(currentReport.dateViews.dates,date))return;selectedDate=date;frameReady=false;reportFrame.src='admin.html?mode=viewer&v='+encodeURIComponent(lastTemplate||'current')+'&report='+lastRevision+'&view='+(++viewSequence);}});
 async function refreshReport(){
  if(loading)return;loading=true;const status=document.getElementById('viewerStatus');
  try{
