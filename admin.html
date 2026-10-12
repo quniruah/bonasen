@@ -614,7 +614,7 @@ $('addSale').onclick=()=>{addSalesBundle(state);render();};for(const [id,g] of [
 function download(content,name,type){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('save').onclick=()=>{try{validate(state);download(JSON.stringify(state,null,2),'보나센_입력값.json','application/json');}catch(e){alert(e.message);}};$('load').onclick=()=>$('file').click();$('file').onchange=async()=>{const f=$('file').files[0];if(!f)return;try{const next=validate(JSON.parse(await f.text()));if(confirm('현재 입력값을 백업 파일의 값으로 바꿀까요?')){state=next;state.ledger.view='actual';render();}}catch(e){alert('불러오기 실패: '+e.message);}finally{$('file').value='';}};$('reset').onclick=()=>{if(confirm('현재 입력값과 모든 연도의 일매출 기록을 지우고 초기화할까요? 기록을 보관하려면 먼저 입력값 백업을 저장하세요.')){state=defaults();render();}};$('print').onclick=()=>{try{validate(state);window.print();}catch(e){alert(e.message);}};
 $('csv').onclick=()=>{try{validate(state);const basis=costBasis(state),c=calculate(basis),rows=[['보나센 원가표','부가세 포함 비교 기준'],['기간',state.period],['적용 개월',basis.months],['계산 기준',state.ledger.view==='actual'?state.ledger.year+'년 '+(state.ledger.month?state.ledger.month+'월 '+state.ledger.day+'일까지 누계':'연간'):'판매계획 예측'],['월 목표 매출',basis.monthlyTarget],['기간 목표 매출',revenueTarget(basis).target],['목표 매출 달성률',revenueTarget(basis).ratio===null?'목표 미입력':pct(revenueTarget(basis).ratio)],['업체', state.vendor],['생산수량',state.production],['판매제품수',c.sold],['개당 제조원가',c.unit],['총 생산비 (완제품)',c.prodCash],[],['월 전체 원가·지출예산','확정 금액'],...(state.ledger.view==='actual'?budgetKeys.map((k,i)=>[k==='cogs'?'누적 판매 제품 제조원가':budgetNames[i],['cogs','fee','ship','pack'].includes(k)?c[k]:basis.monthCostBudget[k]]):[]),[],['항목','기간 총액','판매 제품 개당'],...costRows(c).map(([n,v])=>[n,v,c.sold?v/c.sold:'판매수량 미입력']),[],['비용 종류','항목','주기','단가','수량','기간 총액'],...['ads','admin'].flatMap(g=>state[g].map(r=>[g==='ads'?'광고':'관리',r.name,r.cycle==='monthly'?'월 반복':'1회',r.rate,r.qty,c.cost(r)])),['리뷰','리뷰 부대비','','','',c.reviewBase],['리뷰','제공 제품 제조비','','','',c.reviewProduct],[],['별도 월 고정비 (제품 원가·고정비 차감 전 이익에서 제외)','월 금액','기간 금액'],...state.fixed.map(r=>[r.name,r.enabled?r.rate:0,r.enabled?r.rate*state.months:0]),['고정비 합계',fixedTotals(basis).monthly,fixedTotals(basis).period],['기간 이익 (고정비 차감 후)','',operatingTotals(costBasis(state)).period],[state.months===1?'월 이익 (고정비 차감 후)':'월평균 이익 (고정비 차감 후)',operatingTotals(costBasis(state)).monthly,''],[],['판매처','판매구성','판매수수료율','판매가','주문수','건당 광고전 이익','건당 이익 (고정비 차감 전)','세트당 고정비 배부액','세트당 최종 이익','기간 최종 이익'],...reportingSales(state).map(r=>{const {before:b,profit:p,fixedAllocation:fa,finalProfit:fp}=bundleProfit(r,c,fixedTotals(basis).period);return[channelName(r.channel),r.units,r.fee,r.price,r.orders,b,p===null?'판매수량 미입력':p,fa,fp,fp===null?'판매수량 미입력':fp*r.orders];})];const safe=v=>{let t=String(v??'');if(typeof v==='string'&&/^[=+@-]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"';};download('\ufeff'+rows.map(r=>r.map(safe).join(',')).join('\r\n'),'보나센_원가표.csv','text/csv;charset=utf-8');}catch(e){alert(e.message);}};
-$('useExpectedTarget').onclick=()=>{if(!state.ledger.month)return;const plan=calculate({...state,monthCostBudget:undefined,months:1,sales:state.sales.map(r=>({...r,orders:r.orders/state.months}))});ensureLedgerYear(state).targets[state.ledger.month-1]=plan.income;update();};$('ledgerMonth').onchange=()=>{if(isSharedViewer())return;state.ledger.month=Number($('ledgerMonth').value);if(state.ledger.month)state.ledger.day=Math.min(state.ledger.day,daysInMonth(state.ledger.year,state.ledger.month));update();};$('ledgerDay').onchange=()=>{state.ledger.day=Number($('ledgerDay').value);update();};$('resetDailyTarget').onclick=()=>{delete ensureLedgerYear(state).dailyTargets[selectedLedgerDate(state)];update();};$('ledgerView').onchange=()=>{state.ledger.view=$('ledgerView').value;render();};$('ledgerOnceMonth').onchange=()=>{state.ledger.onceMonth=Number($('ledgerOnceMonth').value);update();};$('ledgerCsv').onclick=exportLedgerCsv;
+$('useExpectedTarget').onclick=()=>{if(!state.ledger.month)return;const plan=calculate({...state,monthCostBudget:undefined,months:1,sales:state.sales.map(r=>({...r,orders:r.orders/state.months}))});ensureLedgerYear(state).targets[state.ledger.month-1]=plan.income;update();};$('ledgerMonth').onchange=()=>{if(isSharedViewer()){requestSharedDate();return;}state.ledger.month=Number($('ledgerMonth').value);if(state.ledger.month)state.ledger.day=Math.min(state.ledger.day,daysInMonth(state.ledger.year,state.ledger.month));update();};$('ledgerDay').onchange=()=>{if(isSharedViewer()){requestSharedDate();return;}state.ledger.day=Number($('ledgerDay').value);update();};$('resetDailyTarget').onclick=()=>{delete ensureLedgerYear(state).dailyTargets[selectedLedgerDate(state)];update();};$('ledgerView').onchange=()=>{state.ledger.view=$('ledgerView').value;render();};$('ledgerOnceMonth').onchange=()=>{state.ledger.onceMonth=Number($('ledgerOnceMonth').value);update();};$('ledgerCsv').onclick=exportLedgerCsv;
 $('salesChannel').onchange=()=>{state.ledger.channel=$('salesChannel').value;render();};$('exportPublic').onclick=()=>{try{download(buildUserPage(state),'index.html','text/html;charset=utf-8');}catch(e){alert('공개 페이지 생성 실패: '+e.message);}};if(!isSharedViewer()){state.ledger.view='actual';render();}
 
 function buildPublicState(source){
@@ -638,17 +638,30 @@ function publicAnnualSalesSummary(s){
   result.ledger={offlineEnabled:!!s.ledger.offlineEnabled,channelNames,year:s.ledger.year,month,day:s.ledger.day,view:'actual',channel:'coupang',onceYear:s.ledger.onceYear,onceMonth:s.ledger.onceMonth,years:{[s.ledger.year]:{targets:year.targets.map((value,i)=>!month||i===month-1?value:0),days:dates,budgets,fixedMonths,expenseMonths,dailyTargets:{}}}};
   return validate(result);
 }
+function buildPublicDateViews(source){
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),year=source.ledger.year,maxDate=String(year)+'-12-31'<today?String(year)+'-12-31':today;
+ if(year>Number(today.slice(0,4)))throw Error('미래 연도는 사용자에게 공개할 수 없습니다.');
+ const keys=[],values=[],lookup=new Map(),dates={};
+ for(let month=1;month<=12;month++)for(let day=1;day<=daysInMonth(year,month);day++){
+  const date=year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');if(date>maxDate)continue;
+  const scoped=validate(JSON.parse(JSON.stringify(source)));scoped.ledger.month=month;scoped.ledger.day=day;scoped.ledger.view='actual';selectExpenseRows(scoped);selectFixedRows(scoped);calculate(costBasis(scoped));
+  const view=buildPublicState(scoped);view.inventoryHistory=view.inventoryHistory.filter(r=>r.date.slice(0,4)===String(year));
+  if(!keys.length)keys.push(...Object.keys(view));
+  dates[date]=keys.map(key=>{const encoded=JSON.stringify(view[key]);if(!lookup.has(encoded)){lookup.set(encoded,values.length);values.push(JSON.parse(encoded));}return lookup.get(encoded);});
+ }
+ return{year,maxDate,keys,values,dates};
+}
+function readPublicDateView(views,date){if(!Object.hasOwn(views.dates,date))throw Error('공개된 날짜가 아닙니다.');const refs=views.dates[date];return Object.fromEntries(views.keys.map((key,i)=>[key,JSON.parse(JSON.stringify(views.values[refs[i]]))]));}
 function buildPublicReport(source){
-  // Materialize the selected period budgets before copying the permitted public period.
-  calculate(costBasis(source));
-  return JSON.stringify({schema:'bonasen-public-v2',publishedAt:new Date().toISOString(),state:buildPublicState(source)});
+ calculate(costBasis(source));const views=buildPublicDateViews(source),selected=source.ledger.month?selectedLedgerDate(source):views.maxDate,date=Object.hasOwn(views.dates,selected)?selected:views.maxDate;
+ return JSON.stringify({schema:'bonasen-public-v2',publishedAt:new Date().toISOString(),state:readPublicDateView(views,date),dateViews:views});
 }
 function isSharedViewer(){return new URLSearchParams(window.location.search).get('mode')==='viewer';}
 function refreshStockRangeView(){if(isSharedViewer()){renderStockMovementTable(state);makeReportControlsReadonly($('stockMovements'));}else update();}
 function makeReportControlsReadonly(scope){
   for(const button of scope.querySelectorAll('button')){if(button.id==='stockRangeReset'||button.dataset.orderTab||button.dataset.dailyToggle)continue;button.disabled=true;button.hidden=true;}
   for(const control of scope.querySelectorAll('input,select,textarea')){
-    if(['stockRangeFrom','stockRangeTo'].includes(control.id))continue;
+    if(['stockRangeFrom','stockRangeTo'].includes(control.id)||state.publicDateChoices&&['ledgerMonth','ledgerDay'].includes(control.id))continue;
     if(control.type==='file'||control.type==='hidden'){control.hidden=true;continue;}
     const display=document.createElement('span');display.className='readonly-value'+((control.type==='number'||control.dataset.groupedNumber)?' readonly-number':control.type==='checkbox'?' readonly-check':'');
     display.textContent=control.type==='checkbox'?(control.checked?'포함':'제외'):control.tagName==='SELECT'?(control.selectedOptions[0]?.textContent||control.value):((control.type==='number'||control.dataset.groupedNumber)&&!['ledgerYear','ledgerOnceYear'].includes(control.id)?groupedNumberText(control.value):control.value)||'—';
@@ -660,11 +673,20 @@ function makeSharedViewReadonly(){document.body.classList.add('readonly-page');
   $('cloudGate').hidden=true;$('adminWorkspace').hidden=false;
   const workspace=$('adminWorkspace');
   for(const node of workspace.querySelectorAll('.toolbar,#status,#cloudNotice,#forecastStatus,#ledgerStatus,#warnings'))node.hidden=true;
-  makeReportControlsReadonly(workspace);formatZeroTableResults(workspace);
+  configureSharedDateControls();makeReportControlsReadonly(workspace);formatZeroTableResults(workspace);
   document.querySelector('header h1').textContent='보나센 매출·손익·재고 관리';
   document.querySelector('header p').textContent='관리자가 공개한 결과 · 조회 전용';
   const footer=workspace.querySelector('footer');if(footer)footer.textContent='';
   const annual=workspace.querySelector('#annualSummary')?.closest('details');if(annual){annual.hidden=false;annual.open=false;}
+}
+function configureSharedDateControls(){
+ const choices=state.publicDateChoices;if(!choices)return;
+ $('ledgerMonth').innerHTML=Object.keys(choices.months).map(month=>'<option value="'+month+'" '+(Number(month)===state.ledger.month?'selected':'')+'>'+month+'월</option>').join('');
+ const maximum=choices.months[state.ledger.month];$('ledgerDay').disabled=false;$('ledgerDay').innerHTML=Array.from({length:maximum},(_,i)=>'<option value="'+(i+1)+'" '+(i+1===state.ledger.day?'selected':'')+'>'+state.ledger.month+'월 '+(i+1)+'일</option>').join('');
+}
+function requestSharedDate(){
+ if(!state.publicDateChoices)return;const month=Number($('ledgerMonth').value),max=state.publicDateChoices.months[month];if(!max)return;const day=Math.min(Number($('ledgerDay').value)||1,max),date=state.ledger.year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+ window.parent.postMessage({type:'BONASEN_SELECT_DATE',date},'*');
 }
 function startSharedViewer(){
   $('cloudGate').hidden=true;
